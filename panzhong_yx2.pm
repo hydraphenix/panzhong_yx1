@@ -3255,11 +3255,20 @@ sub cutadaptor_multiplex_cpu
       ########  multiplex cpu to calculate circRNA
          foreach my $reads(sort keys %reads)
          {
-                 my $adaptor2_use=$adaptor2;
-                 $adaptor2_use=$cutadapt_mirna->{$reads}, if(exists($cutadapt_mirna->{$reads}));
-                 $semaphore->down();                 
-			     my $thread=threads->new(\&_run_cutadapt,$data_dir,$reads,$file_type,$read_suffix1,$read_suffix2,$read_type,$cut_dir,$semaphore,$adaptor1,$adaptor2_use,$phred);
-	             $thread->detach();
+                 my $adaptor2_use=$adaptor2;                 
+                 $semaphore->down();        
+                 if(exists($cutadapt_mirna->{$reads}))
+                 {
+                    $adaptor2_use=$cutadapt_mirna->{$reads};         
+			         my $thread=threads->new(\&_run_cutadapt_mirna,$data_dir,$reads,$file_type,$read_suffix1,$read_suffix2,$read_type,$cut_dir,$semaphore,$adaptor1,$adaptor2_use,$phred);
+			         $thread->detach();
+			      }
+			      else
+			      {
+					 my $thread=threads->new(\&_run_cutadapt,$data_dir,$reads,$file_type,$read_suffix1,$read_suffix2,$read_type,$cut_dir,$semaphore,$adaptor1,$adaptor2_use,$phred);
+			         $thread->detach(); 
+				   }
+	             
          }
          sleep(3);
          &waitquit($max_threads,$semaphore);   ############ must
@@ -3267,6 +3276,98 @@ sub cutadaptor_multiplex_cpu
 }
 
 sub _run_cutadapt
+{
+	         my ($data_dir,$reads,$file_type,$read_suffix1,$read_suffix2,$read_type,$cut_dir,$semaphore,$adaptor1,$adaptor2,$phred)=@_;
+                 print "cutadapt: $reads, $read_type\n";
+                       if($read_type eq "P")
+                       {                     ##################
+                               my $cmd;
+                               my ($read1,$read2)=("$reads"."$read_suffix1".".$file_type","$reads"."$read_suffix2".".$file_type");
+                              unless(-f "$cut_dir/$read1" && -f "$cut_dir/$read2")
+                              {
+								  unless(-f "$cut_dir/$read1.gz" && -f "$cut_dir/$read2.gz")
+                                 {
+                                    if(-f "$data_dir/$read1" && -f "$data_dir/$read2")
+                                    {
+                                             if($phred == 64)
+                                             {
+                                                    $cmd="cutadapt -m 20 -q 15 --quality-base=64 -a $adaptor1 -A $adaptor2 -o $cut_dir/$read1 -p $cut_dir/$read2 $data_dir/$read1 $data_dir/$read2";
+											  }
+											 else
+											 {
+													$cmd="cutadapt -m 20 -q 15  -a $adaptor1 -A $adaptor2 -o $cut_dir/$read1 -p $cut_dir/$read2 $data_dir/$read1 $data_dir/$read2";   
+											 }
+                                                    print $cmd,"\n"; system($cmd);
+                                    }
+                                    elsif((-f "$data_dir/$read1.gz") && -f ("$data_dir/$read2.gz") && (not -f "$data_dir/$read1") && (not -f "$data_dir/$read2"))
+                                    {
+                                             if($phred == 64)
+                                             {
+                                                    $cmd="cutadapt -m 20 -q 15 --quality-base=64 -a $adaptor1 -A $adaptor2 -o $cut_dir/$read1 -p $cut_dir/$read2 $data_dir/$read1.gz $data_dir/$read2.gz";
+											 }
+											 else
+											 {
+													$cmd="cutadapt -m 20 -q 15  -a $adaptor1 -A $adaptor2 -o $cut_dir/$read1 -p $cut_dir/$read2 $data_dir/$read1.gz $data_dir/$read2.gz";   
+											 }
+                                                    print $cmd,"\n"; system($cmd);
+                                     }
+                                    else
+                                     {
+                                                    print "can't find $read1 or $read1.gz under $data_dir\n";
+                                     }
+                                   #&get_length_distribution_plot($cut_dir,$read1);
+                                   #&get_length_distribution_plot($cut_dir,$read2);
+                                }
+							}
+
+                       }
+                       else
+                       {
+						   my $cmd;
+                           my $read1="$reads".".$file_type";
+                           unless(-f "$cut_dir/$read1")
+                              {
+								  unless(-f "$cut_dir/$read1.gz")
+                                 {
+                                    if(-f "$data_dir/$read1")
+                                    {
+                                             if($phred == 64)
+                                             {
+                                                   $cmd="cutadapt -m 15 -q 15 --quality-base=64 -a $adaptor1 -o $cut_dir/$read1 $data_dir/$read1";
+											  }
+											 else
+											 {
+													$cmd="cutadapt -m 15 -q 15  -a $adaptor1 -o $cut_dir/$read1 $data_dir/$read1";   
+											 }
+                                                   print $cmd,"\n"; system($cmd);
+                                    }
+                                    elsif((-f "$data_dir/$read1.gz") && (not -f "$data_dir/$read1"))
+                                    {
+                                             if($phred == 64)
+                                             {
+                                                   $cmd="cutadapt -m 15 -q 15 --quality-base=64 -a $adaptor1 -o $cut_dir/$read1 $data_dir/$read1.gz";
+											 }
+											 else
+											 {
+													$cmd="cutadapt -m 15 -q 15 -a $adaptor1 -o $cut_dir/$read1 $data_dir/$read1.gz";   
+											 }
+                                                   print $cmd,"\n"; system($cmd);
+                                     }
+                                    else
+                                     {
+                                                   print "can't find $read1 or $read1.gz under $data_dir\n";
+                                     }
+                                   #&get_length_distribution_plot($cut_dir,$read1);
+                                }
+							}	
+					}
+
+                   $semaphore->up(); ##release signal
+} #sub ciri_reads
+
+
+
+sub _run_cutadapt_mirna
 {
 	         my ($data_dir,$reads,$file_type,$read_suffix1,$read_suffix2,$read_type,$cut_dir,$semaphore,$adaptor1,$adaptor2,$phred)=@_;
                  print "cutadapt: $reads, $read_type\n";
@@ -3355,7 +3456,6 @@ sub _run_cutadapt
 
                    $semaphore->up(); ##release signal
 } #sub ciri_reads
-
 
 
                            ###  &get_length_distribution_plot($cut_dir,$fq);
