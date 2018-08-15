@@ -57,7 +57,7 @@ if($server eq 'yx')
 }
 else
 {
-     $mysqlserver='192.168.0.211';
+     $mysqlserver='192.168.0.212';
      $mysqluser='root';   $mysqlpw='123456';
 }
 my $database = 'panzhong';
